@@ -1,0 +1,2 @@
+- Keep changes simple and minimal.
+- Do not create additional documentation, tests, comments, or demo files unless explicitly asked.
