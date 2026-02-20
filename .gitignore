@@ -25,3 +25,6 @@ replay_pid*
 
 # Maven build output
 target/
+
+# Generated output
+output_1.txt
