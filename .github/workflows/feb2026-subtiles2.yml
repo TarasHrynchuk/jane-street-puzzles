@@ -23,6 +23,13 @@ jobs:
       - name: Run Feb2026_Subtiles2
         run: java -cp target/classes Feb2026_Subtiles2
 
+      - name: Write summary
+        run: |
+          echo '## Output Matrix' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat output_1.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
       - name: Upload output_1.txt
         uses: actions/upload-artifact@v4
         with:
