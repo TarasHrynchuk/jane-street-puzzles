@@ -1,32 +1,29 @@
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.math.BigInteger;
+import java.util.Optional;
 
-class FormulaResult {
-    enum Reason { OK, NOT_INTEGER, OUT_OF_RANGE, NOT_FINITE }
+enum EvalResultType { VALUE, OUT_OF_RANGE, INVALID }
 
-    final double raw;
-    final int value;
-    final boolean valid;
-    final Reason reason;
+class EvalResult {
+    final EvalResultType type;
+    final BigInteger value;
 
-    private FormulaResult(double raw, int value, boolean valid, Reason reason) {
-        this.raw = raw;
+    private EvalResult(EvalResultType type, BigInteger value) {
+        this.type = type;
         this.value = value;
-        this.valid = valid;
-        this.reason = reason;
     }
 
-    static FormulaResult of(double raw) {
-        if (Double.isNaN(raw) || Double.isInfinite(raw))
-            return new FormulaResult(raw, 0, false, Reason.NOT_FINITE);
-        int iv = (int) Math.round(raw);
-        if (Math.abs(raw - iv) > 1e-9)
-            return new FormulaResult(raw, iv, false, Reason.NOT_INTEGER);
-        if (iv < 1 || iv > 17)
-            return new FormulaResult(raw, iv, false, Reason.OUT_OF_RANGE);
-        return new FormulaResult(raw, iv, true, Reason.OK);
+    static final EvalResult INVALID = new EvalResult(EvalResultType.INVALID, null);
+
+    static EvalResult of(BigInteger v) {
+        if (v.compareTo(BigInteger.ONE) < 0 || v.compareTo(BigInteger.valueOf(17)) > 0)
+            return new EvalResult(EvalResultType.OUT_OF_RANGE, v);
+        return new EvalResult(EvalResultType.VALUE, v);
     }
+
+    boolean isValid() { return type == EvalResultType.VALUE; }
 }
 
 public class Feb2026_Subtiles2_13 {
@@ -90,8 +87,45 @@ public class Feb2026_Subtiles2_13 {
         }
     }
 
-    // Returns array of formula values in grid order, or null if a denominator guard fails.
-    // Each formula is validated via FormulaResult; returns null if any result is invalid.
+    // ── Exact-arithmetic helpers ──────────────────────────────────────────────
+
+    static Optional<BigInteger> divideExact(BigInteger a, BigInteger b) {
+        if (b.equals(BigInteger.ZERO)) return Optional.empty();
+        BigInteger[] dr = a.divideAndRemainder(b);
+        return dr[1].equals(BigInteger.ZERO) ? Optional.of(dr[0]) : Optional.empty();
+    }
+
+    static Optional<BigInteger> sqrtExact(BigInteger n) {
+        if (n.signum() < 0) return Optional.empty();
+        BigInteger[] sr = n.sqrtAndRemainder();
+        return sr[1].equals(BigInteger.ZERO) ? Optional.of(sr[0]) : Optional.empty();
+    }
+
+    static Optional<BigInteger> cbrtExact(BigInteger n) {
+        if (n.equals(BigInteger.ZERO)) return Optional.of(BigInteger.ZERO);
+        boolean negative = n.signum() < 0;
+        BigInteger absN = n.abs();
+        int bits = (absN.bitLength() + 2) / 3;
+        BigInteger hi = BigInteger.ONE.shiftLeft(bits + 1);
+        BigInteger lo = BigInteger.ONE;
+        while (lo.compareTo(hi) <= 0) {
+            BigInteger mid = lo.add(hi).shiftRight(1);
+            int cmp = mid.pow(3).compareTo(absN);
+            if (cmp == 0) return Optional.of(negative ? mid.negate() : mid);
+            else if (cmp < 0) lo = mid.add(BigInteger.ONE);
+            else hi = mid.subtract(BigInteger.ONE);
+        }
+        return Optional.empty();
+    }
+
+    static boolean inAllowedRange(BigInteger v) {
+        return v.compareTo(BigInteger.ONE) >= 0 && v.compareTo(BigInteger.valueOf(17)) <= 0;
+    }
+
+    private static EvalResult inRange(BigInteger v) { return EvalResult.of(v); }
+
+    // ── Returns array of formula values in grid order, or null if any is invalid ──
+
     private static int[] computeFormulas(int a, int b, int c) {
         if (c == 1) return null;
         if ((c - 3 * a) == 0) return null;
@@ -101,7 +135,7 @@ public class Feb2026_Subtiles2_13 {
         if ((9 * a - 5 * c) == 0) return null;
         if (a == 1) return null;
 
-        FormulaResult[] results = {
+        EvalResult[] results = {
             f_0_4(b, c),
             f_1_7(b),
             f_2_1(a, b, c), f_2_3(b, c), f_2_5(b, c), f_2_7(a, c), f_2_9(a, b, c),
@@ -119,50 +153,217 @@ public class Feb2026_Subtiles2_13 {
 
         int[] vals = new int[results.length];
         for (int i = 0; i < results.length; i++) {
-            if (!results[i].valid) return null;
-            vals[i] = results[i].value;
+            if (!results[i].isValid()) return null;
+            vals[i] = results[i].value.intValue();
         }
         return vals;
     }
 
-    // Formula methods named f_[row]_[col]
-    static FormulaResult f_0_4(int b, int c)  { return FormulaResult.of(6.0 * c - 4.0 * b); }
-    static FormulaResult f_1_7(int b)         { return FormulaResult.of(8.0 - b); }
-    static FormulaResult f_2_1(int a, int b, int c) { return FormulaResult.of((Math.pow(a, b) - 4.0) / (6.0 * c + 1.0)); }
-    static FormulaResult f_2_3(int b, int c)  { return FormulaResult.of((b + c) / (double)(c - 1)); }
-    static FormulaResult f_2_5(int b, int c)  { return FormulaResult.of(b * b - (double) b / c); }
-    static FormulaResult f_2_7(int a, int c)  { return FormulaResult.of(Math.sqrt(30.0 + a) / c); }
-    static FormulaResult f_2_9(int a, int b, int c) { return FormulaResult.of((a + b) / (double)(c - 3 * a)); }
-    static FormulaResult f_3_3(int a, int b, int c) { return FormulaResult.of((b - 3.0 * a) / (a - c)); }
-    static FormulaResult f_3_5(int a, int b)  { return FormulaResult.of(8.0 * a - 2.0 * b); }
-    static FormulaResult f_3_7(int a, int b, int c) { return FormulaResult.of((double) b / (a - c)); }
-    static FormulaResult f_3_9(int b, int c, int a) { return FormulaResult.of((b + 9.0) / Math.sqrt(c - a)); }
-    static FormulaResult f_4_1(int a, int c)  { return FormulaResult.of(18.0 / (a * c + 1.0)); }
-    static FormulaResult f_4_4(int b, int c)  { return FormulaResult.of(Math.pow(c, b)); }
-    static FormulaResult f_4_9(int b, int c)  { return FormulaResult.of((3.0 + b * b) / Math.sqrt(3.0 + 2.0 * c)); }
-    static FormulaResult f_5_2(int a, int b, int c) { return FormulaResult.of((double) b / (a * a - c * c)); }
-    static FormulaResult f_5_12(int a)        { return FormulaResult.of(Math.sqrt(a + 2.0) / a); }
-    static FormulaResult f_6_1(int a, int b)  { return FormulaResult.of(Math.pow(a, b) - 12.0 / a); }
-    static FormulaResult f_6_3(int a, int c)  { return FormulaResult.of(2.0 * c + (double) c / a); }
-    static FormulaResult f_6_5(int a, int b)  { return FormulaResult.of(4.0 * a - 5.0 * b); }
-    static FormulaResult f_6_7(int a, int c)  { return FormulaResult.of(c + 2.0 * a); }
-    static FormulaResult f_6_9(int a, int b, int c) { return FormulaResult.of((double) b / (9 * a - 5 * c)); }
-    static FormulaResult f_7_0(int b, int c)  { return FormulaResult.of((Math.pow(b, 3) + 2.0 * c) / (b + 2.0 * c)); }
-    static FormulaResult f_7_7(int a, int b)  { return FormulaResult.of((double) b / (a - 1)); }
-    static FormulaResult f_8_1(int a, int b, int c) { return FormulaResult.of((c - b) / (2.0 * a)); }
-    static FormulaResult f_8_6(int a, int b, int c) { return FormulaResult.of((double) b / (a - c)); }
-    static FormulaResult f_8_9(int a, int b, int c) { return FormulaResult.of((b + c) / (double)(a - c)); }
-    static FormulaResult f_9_1(int a, int c)  { return FormulaResult.of(Math.log(a) / Math.log(c)); }
-    static FormulaResult f_9_2(int a, int b, int c) { return FormulaResult.of((c * c - b) / (double) a); }
-    static FormulaResult f_9_4(int b)         { return FormulaResult.of(Math.pow(b - 1, 2)); }
-    static FormulaResult f_9_7(int a, int c)  { return FormulaResult.of(Math.cbrt(43.0 - a * c) / a); }
-    static FormulaResult f_10_1(int a, int b, int c) { return FormulaResult.of((b - a) / (double)(a - c)); }
-    static FormulaResult f_10_3(int b)        { return FormulaResult.of(11.0 - b); }
-    static FormulaResult f_10_5(int a, int b, int c) { return FormulaResult.of((b - 2.0 * a) / (a - c)); }
-    static FormulaResult f_10_7(int a, int c) { return FormulaResult.of((c + 3.0) / a); }
-    static FormulaResult f_10_9(int b, int c) { return FormulaResult.of(8.0 * c - (double) b / c); }
-    static FormulaResult f_11_4(int b)        { return FormulaResult.of(b * b); }
-    static FormulaResult f_12_6(int a, int b, int c) { return FormulaResult.of((Math.pow(2, b) + 1.0) / (a * c)); }
+    // ── Formula methods named f_[row]_[col] ──────────────────────────────────
+
+    static EvalResult f_0_4(int b, int c) {
+        return inRange(BigInteger.valueOf(6L * c - 4L * b));
+    }
+
+    static EvalResult f_1_7(int b) {
+        return inRange(BigInteger.valueOf(8L - b));
+    }
+
+    static EvalResult f_2_1(int a, int b, int c) {
+        BigInteger num = BigInteger.valueOf(a).pow(b).subtract(BigInteger.valueOf(4));
+        BigInteger den = BigInteger.valueOf(6L * c + 1);
+        return divideExact(num, den).map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_2_3(int b, int c) {
+        return divideExact(BigInteger.valueOf(b + c), BigInteger.valueOf(c - 1))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_2_5(int b, int c) {
+        BigInteger B = BigInteger.valueOf(b);
+        return divideExact(B, BigInteger.valueOf(c))
+                .map(q -> inRange(B.multiply(B).subtract(q)))
+                .orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_2_7(int a, int c) {
+        return sqrtExact(BigInteger.valueOf(30L + a))
+                .flatMap(s -> divideExact(s, BigInteger.valueOf(c)))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_2_9(int a, int b, int c) {
+        return divideExact(BigInteger.valueOf(a + b), BigInteger.valueOf(c - 3L * a))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_3_3(int a, int b, int c) {
+        return divideExact(BigInteger.valueOf(b - 3L * a), BigInteger.valueOf(a - c))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_3_5(int a, int b) {
+        return inRange(BigInteger.valueOf(8L * a - 2L * b));
+    }
+
+    static EvalResult f_3_7(int a, int b, int c) {
+        return divideExact(BigInteger.valueOf(b), BigInteger.valueOf(a - c))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_3_9(int b, int c, int a) {
+        return sqrtExact(BigInteger.valueOf(c - a))
+                .flatMap(s -> divideExact(BigInteger.valueOf(b + 9L), s))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_4_1(int a, int c) {
+        return divideExact(BigInteger.valueOf(18), BigInteger.valueOf((long) a * c + 1))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_4_4(int b, int c) {
+        return inRange(BigInteger.valueOf(c).pow(b));
+    }
+
+    static EvalResult f_4_9(int b, int c) {
+        BigInteger num = BigInteger.valueOf(3L + (long) b * b);
+        return sqrtExact(BigInteger.valueOf(3L + 2L * c))
+                .flatMap(s -> divideExact(num, s))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_5_2(int a, int b, int c) {
+        return divideExact(BigInteger.valueOf(b), BigInteger.valueOf((long) a * a - (long) c * c))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_5_12(int a) {
+        return sqrtExact(BigInteger.valueOf(a + 2L))
+                .flatMap(s -> divideExact(s, BigInteger.valueOf(a)))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_6_1(int a, int b) {
+        BigInteger A = BigInteger.valueOf(a);
+        return divideExact(BigInteger.valueOf(12), A)
+                .map(q -> inRange(A.pow(b).subtract(q)))
+                .orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_6_3(int a, int c) {
+        BigInteger C = BigInteger.valueOf(c);
+        return divideExact(C, BigInteger.valueOf(a))
+                .map(q -> inRange(C.multiply(BigInteger.TWO).add(q)))
+                .orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_6_5(int a, int b) {
+        return inRange(BigInteger.valueOf(4L * a - 5L * b));
+    }
+
+    static EvalResult f_6_7(int a, int c) {
+        return inRange(BigInteger.valueOf(c + 2L * a));
+    }
+
+    static EvalResult f_6_9(int a, int b, int c) {
+        return divideExact(BigInteger.valueOf(b), BigInteger.valueOf(9L * a - 5L * c))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_7_0(int b, int c) {
+        BigInteger B = BigInteger.valueOf(b);
+        BigInteger twoC = BigInteger.valueOf(2L * c);
+        BigInteger num = B.pow(3).add(twoC);
+        BigInteger den = B.add(twoC);
+        return divideExact(num, den).map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_7_7(int a, int b) {
+        return divideExact(BigInteger.valueOf(b), BigInteger.valueOf(a - 1L))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_8_1(int a, int b, int c) {
+        return divideExact(BigInteger.valueOf(c - b), BigInteger.valueOf(2L * a))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_8_6(int a, int b, int c) {
+        return divideExact(BigInteger.valueOf(b), BigInteger.valueOf(a - c))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_8_9(int a, int b, int c) {
+        return divideExact(BigInteger.valueOf(b + c), BigInteger.valueOf(a - c))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_9_1(int a, int c) {
+        if (c <= 1) return EvalResult.INVALID;
+        BigInteger A = BigInteger.valueOf(a);
+        BigInteger C = BigInteger.valueOf(c);
+        BigInteger power = C;
+        BigInteger exp = BigInteger.ONE;
+        while (power.compareTo(A) < 0) {
+            power = power.multiply(C);
+            exp = exp.add(BigInteger.ONE);
+        }
+        return power.equals(A) ? inRange(exp) : EvalResult.INVALID;
+    }
+
+    static EvalResult f_9_2(int a, int b, int c) {
+        return divideExact(BigInteger.valueOf((long) c * c - b), BigInteger.valueOf(a))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_9_4(int b) {
+        return inRange(BigInteger.valueOf((long)(b - 1) * (b - 1)));
+    }
+
+    static EvalResult f_9_7(int a, int c) {
+        BigInteger n = BigInteger.valueOf(43L - (long) a * c);
+        return cbrtExact(n)
+                .flatMap(r -> divideExact(r, BigInteger.valueOf(a)))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_10_1(int a, int b, int c) {
+        return divideExact(BigInteger.valueOf(b - a), BigInteger.valueOf(a - c))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_10_3(int b) {
+        return inRange(BigInteger.valueOf(11L - b));
+    }
+
+    static EvalResult f_10_5(int a, int b, int c) {
+        return divideExact(BigInteger.valueOf(b - 2L * a), BigInteger.valueOf(a - c))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_10_7(int a, int c) {
+        return divideExact(BigInteger.valueOf(c + 3L), BigInteger.valueOf(a))
+                .map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_10_9(int b, int c) {
+        BigInteger C = BigInteger.valueOf(c);
+        return divideExact(BigInteger.valueOf(b), C)
+                .map(q -> inRange(C.multiply(BigInteger.valueOf(8)).subtract(q)))
+                .orElse(EvalResult.INVALID);
+    }
+
+    static EvalResult f_11_4(int b) {
+        return inRange(BigInteger.valueOf((long) b * b));
+    }
+
+    static EvalResult f_12_6(int a, int b, int c) {
+        BigInteger num = BigInteger.TWO.pow(b).add(BigInteger.ONE);
+        BigInteger den = BigInteger.valueOf((long) a * c);
+        return divideExact(num, den).map(Feb2026_Subtiles2_13::inRange).orElse(EvalResult.INVALID);
+    }
 
     private static int[][] buildGrid(int[] v) {
         // v indices match the order in computeFormulas return
