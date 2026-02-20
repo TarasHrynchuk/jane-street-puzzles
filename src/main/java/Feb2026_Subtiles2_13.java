@@ -50,9 +50,9 @@ public class Feb2026_Subtiles2_13 {
         StringBuilder sb = new StringBuilder();
         int found = 0;
 
-        for (int a = 1; a <= 10; a++) {
-            for (int b = 1; b <= 5; b++) {
-                for (int c = 1; c <= 10; c++) {
+        for (int a = 1; a <= 200; a++) {
+            for (int b = 1; b <= 10; b++) {
+                for (int c = 1; c <= 50; c++) {
                     int[] vals = computeFormulas(a, b, c);
                     if (vals == null) continue;
 
