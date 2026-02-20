@@ -28,3 +28,5 @@ target/
 
 # Generated output
 output_1.txt
+/output_1.txt
+/output_2.txt
