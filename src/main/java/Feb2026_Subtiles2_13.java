@@ -46,15 +46,16 @@ public class Feb2026_Subtiles2_13 {
     // r11,c5: b^2
     // r12,c8: (2^b+1)/(ac)
 
-    static final int[] constraintHits = new int[7];
+    static final int[] constraintHits = new int[8];
     static final String[] constraintNames = {
-        "c == 1",
-        "(c - 3*a) == 0",
-        "a == c",
-        "(c - a) <= 0",
-        "(a*a - c*c) == 0",
-        "(9*a - 5*c) == 0",
-        "a == 1"
+            "c == 1",
+            "(c - 3*a) == 0",
+            "a == c",
+            "(c - a) <= 0",
+            "(a*a - c*c) == 0",
+            "(9*a - 5*c) == 0",
+            "a == 1",
+            "c.pow(b)",
     };
 
     static final int[] formulaHits = new int[37];
@@ -72,9 +73,18 @@ public class Feb2026_Subtiles2_13 {
         StringBuilder sb = new StringBuilder();
         int found = 0;
 
-        for (int a = 1; a <= 200; a++) {
-            for (int b = 1; b <= 10; b++) {
-                for (int c = 1; c <= 50; c++) {
+        int combinations = 0;
+
+        for (int b : new int[]{2,3,4}) {
+            for (int c = 1; c <= 4; c++) {
+                if (BigInteger.valueOf(c).pow(b).compareTo(BigInteger.valueOf(17)) > 0) {
+                    constraintHits[7]++;
+                    continue;
+                }
+
+                for (int a = 1; a < c; a++) {
+                    combinations++;
+
                     int[] vals = computeFormulas(a, b, c);
                     if (vals == null) continue;
 
@@ -101,7 +111,7 @@ public class Feb2026_Subtiles2_13 {
             }
         }
 
-        if (found == 0) sb.append("No valid (a, b, c) combinations found.\n");
+        if (found == 0) sb.append("No valid (a, b, c) combinations found. \nTotal combinations: " + combinations+ " \n");
 
         System.out.print(sb);
         try (PrintWriter pw = new PrintWriter(new FileWriter(OUTPUT_FILE))) {
@@ -186,7 +196,14 @@ public class Feb2026_Subtiles2_13 {
 
         int[] vals = new int[results.length];
         for (int i = 0; i < results.length; i++) {
-            if (!results[i].isValid()) { formulaHits[i]++; return null; }
+            if (!results[i].isValid()) {
+                formulaHits[i]++;
+                if (i == 2) {
+                    System.out.printf("FAIL f_2_1 at a=%d b=%d c=%d: (a^b-4)=%s, (6c+1)=%d%n",
+                            a,b,c, BigInteger.valueOf(a).pow(b).subtract(BigInteger.valueOf(4)), 6*c+1);
+                }
+                return null;
+            }
             vals[i] = results[i].value.intValue();
         }
         return vals;
