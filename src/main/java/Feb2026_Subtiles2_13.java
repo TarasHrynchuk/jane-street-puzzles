@@ -46,6 +46,28 @@ public class Feb2026_Subtiles2_13 {
     // r11,c5: b^2
     // r12,c8: (2^b+1)/(ac)
 
+    static final int[] constraintHits = new int[7];
+    static final String[] constraintNames = {
+        "c == 1",
+        "(c - 3*a) == 0",
+        "a == c",
+        "(c - a) <= 0",
+        "(a*a - c*c) == 0",
+        "(9*a - 5*c) == 0",
+        "a == 1"
+    };
+
+    static final int[] formulaHits = new int[37];
+    static final String[] formulaNames = {
+        "f_0_4",  "f_1_7",  "f_2_1",  "f_2_3",  "f_2_6",  "f_2_8",  "f_2_10",
+        "f_3_4",  "f_3_7",  "f_3_9",  "f_3_11", "f_4_1",  "f_4_5",  "f_4_10",
+        "f_5_3",  "f_5_12", "f_6_2",  "f_6_4",  "f_6_6",  "f_6_8",  "f_6_10",
+        "f_7_0",  "f_7_9",  "f_8_2",  "f_8_7",  "f_8_11",
+        "f_9_1",  "f_9_3",  "f_9_5",  "f_9_8",
+        "f_10_2", "f_10_4", "f_10_6", "f_10_9", "f_10_11",
+        "f_11_5", "f_12_8"
+    };
+
     public static void main(String[] args) throws IOException {
         StringBuilder sb = new StringBuilder();
         int found = 0;
@@ -85,6 +107,17 @@ public class Feb2026_Subtiles2_13 {
         try (PrintWriter pw = new PrintWriter(new FileWriter(OUTPUT_FILE))) {
             pw.print(sb);
         }
+
+        StringBuilder stats = new StringBuilder();
+        stats.append("\n=== Constraint Stats ===\n");
+        for (int i = 0; i < constraintNames.length; i++) {
+            stats.append(String.format("  %-25s blocked %d times%n", constraintNames[i], constraintHits[i]));
+        }
+        stats.append("\n=== Formula Stats ===\n");
+        for (int i = 0; i < formulaNames.length; i++) {
+            stats.append(String.format("  %-10s blocked %d times%n", formulaNames[i], formulaHits[i]));
+        }
+        System.out.print(stats);
     }
 
     // ── Exact-arithmetic helpers ──────────────────────────────────────────────
@@ -127,13 +160,13 @@ public class Feb2026_Subtiles2_13 {
     // ── Returns array of formula values in grid order, or null if any is invalid ──
 
     private static int[] computeFormulas(int a, int b, int c) {
-        if (c == 1) return null;
-        if ((c - 3 * a) == 0) return null;
-        if (a == c) return null;
-        if ((c - a) <= 0) return null;
-        if ((a * a - c * c) == 0) return null;
-        if ((9 * a - 5 * c) == 0) return null;
-        if (a == 1) return null;
+        if (c == 1)                    { constraintHits[0]++; return null; }
+        if ((c - 3 * a) == 0)          { constraintHits[1]++; return null; }
+        if (a == c)                    { constraintHits[2]++; return null; }
+        if ((c - a) <= 0)              { constraintHits[3]++; return null; }
+        if ((a * a - c * c) == 0)      { constraintHits[4]++; return null; }
+        if ((9 * a - 5 * c) == 0)      { constraintHits[5]++; return null; }
+        if (a == 1)                    { constraintHits[6]++; return null; }
 
         EvalResult[] results = {
             f_0_4(b, c),
@@ -153,7 +186,7 @@ public class Feb2026_Subtiles2_13 {
 
         int[] vals = new int[results.length];
         for (int i = 0; i < results.length; i++) {
-            if (!results[i].isValid()) return null;
+            if (!results[i].isValid()) { formulaHits[i]++; return null; }
             vals[i] = results[i].value.intValue();
         }
         return vals;
